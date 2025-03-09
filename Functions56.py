@@ -29,15 +29,20 @@ class Wheel:
         """
         :param speed - the speed you want to go at
         """
-        self.left.start()
-        self.right.start()
+        self.left.start(speed)
+        self.right.start(speed)
     
     def turnWheels(self, speed):
         """
         :param speed - the speed you want to go at
         """
-        self.left.run_for_degrees(360, blocking=False)
-        self.right.run_for_degrees(360, blocking=False)
+        self.left.start(speed)
+        self.right.start(speed)
+        
+    def turnWheelsDeg(self, degree):
+        self.left.run_for_degrees(-degree, blocking=False)
+        self.right.run_for_degrees(degree,blocking=False)
+        time.sleep(0.3)
 
     # This is a problem
     def stopWheels(self):
@@ -85,27 +90,70 @@ def gyroRotate(IMU, wheels, direction, degrees, updateSpeed, speed, robotAngle):
     :param speed - the desired speed of the motors
     :param robotAngle - the current angle of the robot
     """
+    '''Werid degree corrections'''
+    if abs(degrees) >= 180:
+        degrees = degrees + 15
+    if abs(degrees) >= 200:
+        degrees = degrees + 18
+    if abs(degrees) > 270:
+        degrees = degrees + 18
+        
+    ''' This try loop has to stay here for the feedback loop to work'''
+    try:
+
+        gain = 0.1 # User can change this value to see how the behavior of the controller changes
+        angle_delta = degrees # User can change this value to see how the behavior of the controller changes
+        gyroVals = ['N/A', 'N/A'] # We start with no gyro values
+        tempAngle = 0
+
+        while abs(tempAngle) <= abs(degrees):
+            
+            print(tempAngle)
+            current_offset = angle_delta - tempAngle
+        
+            if current_offset * gain > 100:
+                speed = 100
+            elif current_offset * gain < -100:
+                speed = -100
+            else:
+                speed = current_offset * gain
+
+            rotate(wheels, direction, speed)
+            gyroVals[0] = gyroVals[1] # The new gyro value is now old
+            gyroVals[1] = (IMU.getGyro())[2] # The new gyro value is created
+            if ( (gyroVals[0] != 'N/A') and (gyroVals[1] != 'N/A') ): # If we have enough data
+                # add to the angle we turned using trapeziodal sums  
+                tempAngle = tempAngle + (trapSum(updateSpeed, gyroVals)*1.2)
+            time.sleep(0.1)
+    except TypeError:
+        print("this is broken")
+    robotAngle = robotAngle + tempAngle # update the robot angle
+            
+    '''
     tempAngle = 0 # Angle is relative to robotAngle, which it should be the same at the start
     gyroVals = ['N/A', 'N/A'] # We start with no gyro values
     print("goodbye!")
+    gain = 0.2 # User can change this value to see how the behavior of the controller changes
+    angle_delta = degrees
     #wheels.stopWheels() # Stop whatever the wheels are doing
     print("goodbye Sam!")
-    rotate(wheels, direction, speed) # begin rotating
-    while(tempAngle < degrees):
+    # begin rotating
+    while(abs(tempAngle) < abs(degrees)):
         time.sleep(updateSpeed) # rotate for updateSpeed before doing everything
         print("Angle:", tempAngle) 
         gyroVals[0] = gyroVals[1] # The new gyro value is now old
         gyroVals[1] = (IMU.getGyro())[2] # The new gyro value is created
         if ( (gyroVals[0] != 'N/A') and (gyroVals[1] != 'N/A') ): # If we have enough data
             # add to the angle we turned using trapeziodal sums  
-            tempAngle = tempAngle + abs(trapSum(updateSpeed, gyroVals))
-    #wheels.stopWheels() # Stop any rotation of the wheels
+            tempAngle = tempAngle + (trapSum(updateSpeed, gyroVals))
+    wheels.stopWheels() # Stop any rotation of the wheels
     robotAngle = robotAngle + tempAngle # update the robot angle
+    '''
     return robotAngle
     
 # Stops, moves wheels the desired degrees, then stops
 # It should be noted that there may be some lag with this setup (going over)
-def moveForward(IMU, wheels, distance, updateSpeed, speed, coords, robotAngle):
+def moveForward(IMU, wheels, distance, updateSpeed, speed, coords, robotAngle, degree):
     """
     :param IMU - a class that represents the IMU sensor
     :param wheels - a class that consists of the two wheel motors
@@ -116,14 +164,21 @@ def moveForward(IMU, wheels, distance, updateSpeed, speed, coords, robotAngle):
     """
     currentDistance = 0 # We should not have moved yet
     speedVals = ['N/A', 'N/A'] # We start with no speed values
-    wheels.startWheels(speed) # Start the wheels
+    # Start the wheels
     while(currentDistance < distance): # While we have not gone the required distance
-        time.sleep(updateSpeed) # Wait before doing anything
+        #Wait before doing anything
         #print("Current Distance", currentDistance)
+         wheels.turnWheelsDeg(degree) # Turn the wheels for the amount of degrees and then stop
+         
+         currentDistance = currentDistance + degree / 360 * m.pi * 6.8 # Get the current distance in cm
+    '''
+        For when we used speed to get distance
+
         speedVals[0] = speedVals[1] # The new value is now old
         speedVals[1] = (wheels.left.get_speed() + wheels.right.get_speed()) * 2 # Multiplied by 4 due to wheel size, get new value
         if (speedVals[0] != 'N/A'): # If we have enough data 
             currentDistance = currentDistance + abs(trapSum(updateSpeed, speedVals)) #update the distance travelled
+    '''
     coords = newCoords(coords, robotAngle, distance) # Get the new coordinates using trig
     return coords
 
@@ -183,7 +238,7 @@ def trapSum(updateSpeed, valList):
     :param valList - The two values you are interested in
     """
     sumZ = updateSpeed * (valList[0] + valList[1])/2 # perform a trap sum
-    return sumZ + 0.175 # Correction factor
+    return sumZ -0.1 # Correction factor
 
 #Takes a list and finds its magnitudes
 def magnitude(list):

@@ -7,15 +7,16 @@ def main():
     Settings
     '''
 
-    mode ='point' # Options - objectAvoid, sourceAvoid, point, grid
+    mode ='objectAvoid' # Options - objectAvoid, sourceAvoid, point, grid, goToPoint
     distance = 1 # How much the robot moves at a time, centimeters
     robotAngle = 0 # Initial angle of robot - Zero is +y, 90 is -x
     updateSpeed = 0.1 # How often the robot goes through control loop, seconds
-    speed = 5 # The default speed of the robot, out of 100 (check?)
+    degreeWheelTurn = 30 # The degree the robot wheels turn each time in movefoward
+    speed = 10 # The default speed of the robot, out of 100 (check?)
     sleepTime = 2 # How long do you want the vehicle to stop after turns?
     
     # object and source avoidance settings
-    walldistance = 10 # determines appropriate distance from wall, centimeters
+    walldistance = 30 # determines appropriate distance from wall, centimeters
     IRdistance = 1 # Determines radius from IR source, centimeters
     hallDistance = 1 # Determines radius from hall source, centimeters
     deltaAngle = 5 # How many degrees the car should correct itself towards target per loop
@@ -23,7 +24,7 @@ def main():
     waveMult = 1.5 # How much should the angle be multiplied each time?
     
     # point turn and grid settings
-    pointTurns = [F.TurnObj('left', 90)] # List of Turn instances (direction, degrees)
+    pointTurns = [F.TurnObj('left', 180)] # List of Turn instances (direction, degrees)
     ObjectiveCoords = [F.coordinates(3, 4)] # List of coordinates instances (x, y)
 
     '''
@@ -77,9 +78,11 @@ def main():
     if (mode == 'point'):
         for turn in pointTurns: # For each turn we must complete
             # Turn the wheels the appropriate distance (this includes stopping wheels), and update the angle
-            robotAngle = F.gyroRotate(IMU, wheels, turn.direction, turn.distance, updateSpeed, speed, robotAngle) 
-            time.sleep(sleepTime)
-                        
+            robotAngle = F.gyroRotate(IMU, wheels, turn.direction, turn.distance, updateSpeed, speed, robotAngle)
+            wheels.stopWheels()
+            time.sleep(2)
+        time.sleep(10000)
+    
     elif (mode == 'grid'):
         for objective in ObjectiveCoordinates: # For each coordinate we must go to
             
@@ -99,10 +102,10 @@ def main():
     elif (mode == 'objectAvoid'):
         while(True):
             # Update sensor values
-            ultraF = F.trying(ultraFront.getDist)
-            ultraS = F.trying(ultraSide.getDist)
-            
-            if ((type(ultraS) is None) == 0 and (type(ultraF) is None) == 0): # If we have a side value and front value
+            try:
+                # Getting the current distance value from the ultrasonic sensor
+                ultraF = ultraFront.getDist
+                ultraS = ultraSide.getDist
                 ultraValueSide = ultraS * walldistanceMult # Get side value
                 ultraValueFront = ultraF * walldistanceMult
                 print(ultraValueSide)
@@ -111,13 +114,18 @@ def main():
                     if (ultraValueSide > walldistance): # If the side value is good
                         print("Hi")
                         robotAngle = F.gyroRotate(IMU, wheels, 'right', 90, updateSpeed, speed, robotAngle) # Rotate toward side, update angle
+                        wheels.stopWheels()
+                        time.sleep(2)
                     else: # If the side value is bad
                         robotAngle = F.gyroRotate(IMU, wheels, 'left', 90, updateSpeed, speed, robotAngle) # Rotate away from side, update angle
-                    #time.sleep(sleepTime)
+                        wheels.stopWheels()
+                        time.sleep(2)
                 else: # If we are far from the wall or have no side value
-                    coords = F.moveForward(IMU, wheels, distance, updateSpeed, speed, coords, robotAngle) # Move forward distance, update your coordinates
-            else:
-                print("NULL!!!!")
+                    coords = F.moveForward(IMU, wheels, distance, updateSpeed, speed, coords, robotAngle, degreeWheelTurn)
+                    #Move forward distance, update your coordinates
+            except TypeError:
+                ultraS = walldistance
+                ultraF = 0.1 + walldistance
 
     elif (mode == 'sourceAvoid'):
 
@@ -136,6 +144,15 @@ def main():
                 wave = wave * (-waveMult -1)  # Waves in the opposite direction
             else: # If we are not too close to a source
                 coords = F.moveForward(IMU, wheels, distance, updateSpeed, speed, coords, robotAngle) # Move forward distance, update your coordinates
-
+    elif (mode == 'goToPoint'):
+        x = int(input("Enter the x cordinate"))
+        y = int(input("Enter the y cordinate"))
+        motorLeft.run_for_rotations(-x*1.67, blocking=False) # Move forward x amount of squares
+        motorRight.run_for_rotations(x*1.67,blocking=False)
+        F.gyroRotate(IMU, wheels, 'right', 90, updateSpeed, speed, robotAngle)
+        motorLeft.run_for_rotations(-y*1.67,blocking=False) # Move forward y amount of squares
+        motorRight.run_for_rotations(x*1.67,blocking=False)
+        wheels.stopWheels()
+        time.sleep(1000)
 if __name__ == '__main__':
     main()
