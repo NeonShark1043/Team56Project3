@@ -6,6 +6,7 @@ from basehat import IMUSensor
 from basehat import UltrasonicSensor
 from basehat import HallSensor
 from basehat import IRSensor
+from basehat import LightSensor
 from enum import Enum
 
 __all__ = ['time', 'Motor', 'IMUSensor', 'UltrasonicSensor',
