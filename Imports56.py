@@ -8,9 +8,11 @@ from basehat import HallSensor
 from basehat import IRSensor
 from basehat import LightSensor
 from enum import Enum
+import random
+
 
 __all__ = ['time', 'Motor', 'IMUSensor', 'UltrasonicSensor',
-           'HallSensor', 'IRSensor', 'Enum']
+           'HallSensor', 'IRSensor', 'Enum', 'random']
            
 '''
 import time

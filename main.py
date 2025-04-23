@@ -2,7 +2,6 @@ from Imports56 import *
 import MazeRobotFunctions as F
 import MapTesting as mapFun
 import math as m
-import random
 
 def main():
     
@@ -19,11 +18,12 @@ def main():
     numSpacesY = 30 # y dimension of map, 30
     squareSize = 120 # Size of each square
     numSpaces = F.coordinates(numSpacesX, numSpacesY) # numSpaces is a coordinate system of map dimensions
-    mapFile = open("theMap",'w') # Open the map file to write
     totalMapList = mapFun.createMapBlank(numSpaces)
     origin = F.coordinates(originX,originY) # origin is a coordinate system of the origin 
-    currentSpot = F.coordinates(originX * squareSize, originY * squareSize)
-    totalMapList[origin.y][origin.x] = 5
+    currentSpot = F.coordinates(originX * squareSize, originY * squareSize) # Current spot, in real terms
+    totalMapList[origin.y][origin.x] = 5 # Set the origin to "5"
+    magCoords = F.coordinates(-1, -1) # Set the magnet and IR coordinates to an invalid state
+    IRCoords = F.coordinates(-1, -1) # This shows that they have not been found
     
     # create instances of Motor class
     motorL = Motor('A') 
@@ -75,7 +75,6 @@ def main():
             sumIR, IRList = F.pushNpopAvg(IRval, IRList, sensorSum)
             sumMag, magList = F.pushNpopAvg(IMUval, magList, sensorSum)
         
-            flag = ""
             # Are we too close to something?
             # The way that this was programmed prioritizes the hazards over null values / end of map           
             if (sumFront < wallDistance or sumIR > IRthreshold or sumMag > Magthreshold):
@@ -83,28 +82,42 @@ def main():
             if (sumSide < wallDistance):
                 sumSide = 0
             if (sumMag > Magthreshold):
+                Magthreshold = sumMag # Make the magnetic field your new maximum
                 sumMag = 0
-                flag = "isMag"
+                # Set your current positon equal to the new mag coordinates
+                magCoords.x = m.floor(currentSpot.x/squareSize)
+                magCoords.y = m.floor(currentSpot.y/squareSize)
             if (sumIR > IRthreshold):
+                IRthreshold = sumIR  # Make the IR value your new maximum
                 sumIR = 0
-                flag = "isIR"
+                # Set your current positon equal to the new IR coordinates
+                IRCoords.x = m.floor(currentSpot.x/squareSize)
+                IRCoords.y = m.floor(currentSpot.y/squareSize)
             
             # sumFront is used to check for nulls / end of map, front is used for everything else
             front = sumFront and sumIR and sumMag
          # We probably want to add something that prioritizes going towards the path we have not seen yet
-        #print(currentSpot.x, currentSpot.y)
         if(sumFront == nullDist and sumSide == nullDist): # If we are outside of the maze (cannot see anything), do ending instructions
+          
             print("Done!")
-            motorC.run_for_degrees(480)
-            time.sleep(1)
-            motorC.run_for_degrees(-480)
+            motorC.run_for_degrees(-480) # Open hatch
             time.sleep(2)
-            wheels.forward(360)
-            motorC.run_for_degrees(540)
-            wheels.turn(-320)
-            wheels.forward(360)
+            wheels.forward(360) # Move forward so that you don't close on the object
+            motorC.run_for_degrees(540) # Close hatch
+            wheels.turn(-320) # Do a wheelie (to avoid seeming threatening)
+            wheels.forward(360) # Move away from box
+            
+            # Add the IR position
+            if (numSpaces.y > IRCoords.y and numSpaces.x > IRCoords.x and IRCoords.y >= 0 and IRCoords.x >= 0):
+                totalMapList[IRCoords.y][IRCoords.x] = 2
+            # Add the Mag position
+            if (numSpaces.y > magCoords.y and numSpaces.x > magCoords.x and magCoords.y >= 0 and magCoords.x >= 0):
+                totalMapList[magCoords.y][magCoords.x] = 3
+                        
+            mapFun.printHazards(IRthreshold, IRCoords, Magthreshold, magCoords, mapNum)
+            
             mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize, 'isEnd')
-            mapFun.exportMap(totalMapList, mapFile, mapNum, origin)
+            mapFun.exportMap(totalMapList, mapNum, origin)
             time.sleep(10000) # end program
             # If the thing on the right is on the outside of the maze or we can go right but not forwards
         elif( (sumFront != nullDist and sumSide == nullDist) or (not front and sumSide) ): 
@@ -135,8 +148,7 @@ def main():
             print("There was an error in the navigation system")
                 
         currentSpot.updateCoords(dCoords) # use the displacement coordinates to update the current spot
-        print(currentSpot.x, currentSpot.y)
-        mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize, flag) # Use this information to update the map
+        mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize, 0) # Use this information to update the map
             
         if(recentChoice > 0): # One less loop until a new choice can be made 
             recentChoice -= 1
