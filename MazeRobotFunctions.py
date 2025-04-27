@@ -49,15 +49,25 @@ class Wheel:
     def forward(self, degree):
         self.left.run_for_degrees(-degree, blocking=False)
         self.right.run_for_degrees(degree,blocking=True)
+        
+    def forwardForSpeed(self, speed):
+        self.left.start(-speed)
+        self.right.start(speed)
         #time.sleep(0.3)
     
     def turn(self, angle):
         """
         :param speed - the speed you want to go at
         """
-        self.left.run_for_degrees(angle * 233.5 / 90, blocking=False)
-        self.right.run_for_degrees(angle * 233.5 / 90,blocking=True)
-        time.sleep(0.3)
+        self.left.run_for_degrees(angle * 2.58, blocking=False)
+        self.right.run_for_degrees(angle * 2.58,blocking=True)
+        
+    def turnRight(self, speed):
+        self.right.start(speed)
+        
+    def turnLeft(self, speed):
+        self.left.start(-speed)
+        
         
 def pushNpopAvg(sensorVal, sensorList, sensorSum):
     sensorList.pop()
@@ -87,3 +97,32 @@ def magnitude(somelist):
     for i in somelist:
         summation = summation + pow(i,2)
     return m.sqrt(summation)
+
+def forwardCommand(wheels, dCoords, increment):
+    wheels.forward(increment) # go forward
+    dCoords.y += increment / 360 * m.pi * 0.223
+    
+def turnCommand(wheels, dCoords, angle):
+    wheels.turn(angle) 
+    dCoords.angle += 90
+
+def chooseCommand(wheels, dCoords, increment, listvals):
+        
+    choices = []    
+        
+    if (listvals[0] == True):
+        choices.append("Forward")
+    if (listvals[1] == True):
+        choices.append("Right")
+                
+    choice = random.choice(choices)
+    
+    if (choice == "Forward"):
+        forwardCommand(wheels, dCoords, increment)
+        print("Forward")
+    elif (choice == "Right"):
+        print("Right")
+        turnCommand(wheels, dCoords, -90)
+    else: print("Error in chooseCommand")
+
+    
