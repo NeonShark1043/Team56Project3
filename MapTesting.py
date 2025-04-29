@@ -9,6 +9,9 @@ Created on Fri Apr 11 16:41:01 2025
 """
 
 def createMapBlank(numSpaces):
+    """
+    :param numSpaces - a coordinate that shows the size of the map
+    """
     #creates a blank map
     totalMapList = []
     for i in range (numSpaces.y):
@@ -16,6 +19,11 @@ def createMapBlank(numSpaces):
     return totalMapList
         
 def exportMap (totalMapList, mapNum, origin):
+    """
+    :param totalMapList - a 2D array of the map
+    :mapNum mapNum - the map number for documentation
+    :origin - a coordinate of the position that we started
+    """
     mapFile = open("theMap",'w') # Open the map file to write
     mapFile.write("Team: 56\n")
     mapFile.write("Map: ")
@@ -39,7 +47,13 @@ def exportMap (totalMapList, mapNum, origin):
     mapFile.flush()
     mapFile.close
     
-def mapCreation(currentSpot, totalMapList, numSpaces, squareSize, end):
+def mapCreation(currentSpot, totalMapList, numSpaces, squareSize):
+    """
+    :param currentSpot - a coordinate of the position of the robot on the map
+    :param totalMapList - a 2D array of the map
+    :param numSpaces - a coordinate that shows the size of the map
+    :param squareSize - the size of a square on the map
+    """
     
     # Converts the actual coordinates to the map square system
     coords = F.coordinates(0, 0)
@@ -47,14 +61,19 @@ def mapCreation(currentSpot, totalMapList, numSpaces, squareSize, end):
     coords.x = m.floor(currentSpot.x/squareSize)
     
     if (numSpaces.y > coords.y and numSpaces.x > coords.x and coords.y >= 0 and coords.x >= 0):
-        if(end == 1):
-            totalMapList[coords.y][coords.x] = 4
-        elif (totalMapList[coords.y][coords.x] == 0):
+        # If we went on an unexplored space, we explored it
+        if (totalMapList[coords.y][coords.x] == 0):
             totalMapList[coords.y][coords.x] = 1
 
     return totalMapList
 
-def printHazards(IRthreshold, IRCoords, magthreshold, magCoords,mapNum):
+def printHazards(IRthreshold, IRCoords, magthreshold, magCoords, mapNum):
+    """
+    :param IRthreshold - the IR value
+    :param IRCoords - the coordinates of the IR beacon
+    :param magthreshold - the magnet value
+    :param magCoords - the coordinates of the magnet
+    """
                 
     mapFile = open("theHazards",'w') # Open the map file to write
     mapFile.write("Team: 56\n")
@@ -78,9 +97,44 @@ def printHazards(IRthreshold, IRCoords, magthreshold, magCoords,mapNum):
     if (IRCoords.y == -1):
         mapFile.write("None Found \n")
     else:
-        mapFile.write(str(IRthreshold))
+        mapFile.write(str(24))
         mapFile.write(", ")
         mapFile.write(str(IRCoords.x))
         mapFile.write(", ")
         mapFile.write(str(IRCoords.y))
         mapFile.write("\n")
+        
+def findPath(totalMapList, currentSpot, squareSize, numSpaces):
+    """
+    :param totalMapList - a 2D array of the map
+    :param currentSpot - a coordinate of the position of the robot on the map
+    :param squareSize - the size of a square on the map
+    :param numSpaces - a coordinate that shows the size of the map
+    """
+    delta = F.coordinates(0, 1)
+    newDirection = F.coordinates(m.floor(currentSpot.x/squareSize), m.floor(currentSpot.y/squareSize))
+    direction = F.coordinates(0, 0)
+    retList = []
+    
+    # This looks at each direction that is adjacent to the current square
+    # and inserts the value into retList
+    # It is front, right, back, left
+    for i in range(4):
+        direction.copyCoordinate(newDirection)
+        turn = i * -90
+        delta.angle = currentSpot.angle - turn
+        direction.updateCoords(delta)
+        if (numSpaces.y >= direction.y and numSpaces.x >= direction.x):
+            retList.append(totalMapList[direction.y][direction.x])
+        else:
+            retList.append(-1)
+
+    return retList
+    
+    
+    
+    
+    
+    
+    
+    

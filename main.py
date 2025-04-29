@@ -12,14 +12,14 @@ def main():
     magMax = Magthreshold
     nullDist = 10000 # Must be far greater than how far the sensor can see
     sensorSum = 2 # How many sensor values are averaged out
-    originX = 2 # What is our initial X coordinate?
-    originY = 2 # What is our initial Y coordinate?
+    originX = 3 # What is our initial X coordinate?
+    originY = 3 # What is our initial Y coordinate?
     increment = 90
         
     mapNum = 1 # Name the map
-    numSpacesX = 18 # x dimension of map
-    numSpacesY = 11 # y dimension of map
-    squareSize = 0.4 # Size of each square
+    numSpacesX = 50 # x dimension of map
+    numSpacesY = 30 # y dimension of map
+    squareSize = 40 # Size of each square
     numSpaces = F.coordinates(numSpacesX, numSpacesY) # numSpaces is a coordinate system of map dimensions
     totalMapList = mapFun.createMapBlank(numSpaces)
     origin = F.coordinates(originX,originY) # origin is a coordinate system of the origin 
@@ -69,12 +69,12 @@ def main():
 
     try:
         while(True):
-            time.sleep(0.01) # This is to prevent things from going too fast...
+            time.sleep(0.01) 
             dCoords.resetDisplacement() # reset the position and the angle
         
             for i in range(sensorSum):
                 # Get the values
-                time.sleep(0.35)
+                time.sleep(0.35) # This is to prevent duplicate values
                 ultraF = F.nullDefault(ultraFront.getDist, nullDist)
                 time.sleep(0.01)
                 ultraR2 = F.nullDefault(ultraRight2.getDist, nullDist)
@@ -108,8 +108,8 @@ def main():
             currentWallDistanceFront = sumFront
             currentWallDistanceRight2 = sumSideRight2
             currentWallDistanceRight1 = sumSideRight1
-            print(frontList, sideRightList1, sideRightList2)
 
+            # Checking if we are next to a wall or a magnet or an IR beacon
             if (sumFront < wallDistance or sumIR > IRthreshold or sumMag > Magthreshold):
                 sumFront = 0
             if (sumSideRight2 < wallDistance * 1.5):
@@ -126,14 +126,16 @@ def main():
                 print("IR")
             else:
                 sumIR = 1
-            
+                        
             # Set up the lists of indicators used for pathfinding
             sumFront = (sumIR and sumMag) * sumFront
             
-            critical = nullDist/2 + 100
-            nulls = [sumFront >= critical, sumSideRight2 >= critical, sumSideRight1 >= critical, 0]
+            
+            nullCutoff = nullDist/2 + 100 # This determines when the robot starts saying there are nulls
+            nulls = [sumFront >= nullCutoff, sumSideRight2 >= nullCutoff, sumSideRight1 >= nullCutoff, 0]
             valid = [sumFront != 0, sumSideRight2 != 0, sumSideRight1 != 0, 0]
             
+            # This counts the number of nulls and puts it at the end of the list
             i = 0
             if nulls[0] == True:
                 i += 1
@@ -141,6 +143,7 @@ def main():
                 i += 1
             nulls[3] = i
         
+            # This counts the number of valids and puts it at the end of the list
             i = 0
             if valid[0] == True:
                 i += 1
@@ -148,8 +151,8 @@ def main():
                 i += 1
             valid[3] = i
             
-            print(nulls)
         
+            # If there is a source, go 180 degrees
             if(sumMag == 0 or sumIR == 0):
                 F.turnCommand(wheels, dCoords, -90)
                 time.sleep(0.5)
@@ -157,7 +160,7 @@ def main():
             elif (nulls[3] == 2 and nulls[2] == True): # If we are outside of the maze (cannot see anything), do ending instructions
             
                 print("Done!")
-                # Move forward a LOT
+                wheels.forward(720) # Move away from the maze
                 motorC.run_for_degrees(-480) # Open hatch
                 time.sleep(2)
                 wheels.forward(360) # Move forward so that you don't close on the object
@@ -168,15 +171,27 @@ def main():
                 # Add the IR position
                 if (numSpaces.y > IRCoords.y and numSpaces.x > IRCoords.x and IRCoords.y >= 0 and IRCoords.x >= 0):
                     totalMapList[IRCoords.y][IRCoords.x] = 2
+                else:
+                    print("IR beacon out of range")
                 # Add the Mag position
                 if (numSpaces.y > magCoords.y and numSpaces.x > magCoords.x and magCoords.y >= 0 and magCoords.x >= 0):
                     totalMapList[magCoords.y][magCoords.x] = 3
+                else:
+                    print("Magnetic beacon out of range")
                     
-                totalMapList[m.floor(currentSpot.x/squareSize)][m.floor(currentSpot.y/squareSize)] = 4
-                        
+                # End position of the robot
+                endX = m.floor(currentSpot.x/squareSize)
+                endY = m.floor(currentSpot.y/squareSize)
+                
+                # If within range, add the end position to the map
+                if (numSpaces.y > endY and numSpaces.x > endX and endY >= 0 and endX >= 0):
+                    totalMapList[endY][endX] = 4
+                else:
+                    print("End coordinate out of range")
+                    
+                # Do all of the mapping functions
                 mapFun.printHazards(IRthreshold, IRCoords, Magthreshold, magCoords, mapNum)
-            
-                mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize, 'isEnd')
+                mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize)
                 mapFun.exportMap(totalMapList, mapNum, origin)
                 time.sleep(10000) # end program
             
@@ -185,7 +200,7 @@ def main():
                 print("Forward is null")
                 F.forwardCommand(wheels, dCoords, increment)
             
-            elif(nulls[1] == True): # If there are nulls other than the forward direction, choose a direction
+            elif(nulls[1] == True and not recentChoice): # If there are nulls other than the forward direction, choose a direction
             
                 print("There are non forward nulls")
                 F.turnCommand(wheels, dCoords, -90)
@@ -196,8 +211,9 @@ def main():
                 if (recentChoice and valid[0] != 0): # If we have recently decided on one option 
                     F.forwardCommand(wheels, dCoords, increment)
                 else:
-                    recentChoice = sensorSum + 20 # We need to prevent ourselves from choosing again
-                    F.chooseCommand(wheels, dCoords, increment, valid)
+                    recentChoice = sensorSum * 4# We need to prevent ourselves from choosing again
+                    directionList = mapFun.findPath(totalMapList, currentSpot, squareSize, numSpaces)
+                    F.chooseCommand(wheels, dCoords, increment, valid, directionList)
                 
             elif(valid[3] == 0): # If there is no valid direction, turn around
                 print("There is no valid direction")
@@ -206,7 +222,8 @@ def main():
                 print("There was an error in the central control system")
             
             status = 0
-
+            
+            # If there are any nulls, do not do the self-correction
             for i in sideRightList1:
                 if i == nullDist:
                     status = 1
@@ -214,28 +231,27 @@ def main():
                 if i == nullDist:
                     status = 1
                
-            print(currentWallDistanceRight2, currentWallDistanceRight1)
-            deltaH = currentWallDistanceRight2 - currentWallDistanceRight1 - 0.1
+            
+            deltaH = currentWallDistanceRight2 - currentWallDistanceRight1
         
-        
+            # Self correction mechanism depends on which sensor is farther from the wall
             if (deltaH < 19.5 and deltaH > -19.5 and currentWallDistanceFront > 40):
-                print ("the distance is high enough")
                 angle = m.atan2(deltaH, 7)
                 if (status == 0):
                     wheels.turn(angle*180/m.pi)
                 
-            # Correct
+            # Correction mechanism
             if (currentWallDistanceRight1 > 9.5 + 1.5 and status == 0 and currentWallDistanceFront > 40 and deltaH < 19.5 and deltaH > -19.5):
                 wheels.turn(-30)
-                wheels.forward(40)
+                wheels.forward(50)
                 wheels.turn(30)
             if (currentWallDistanceRight1 < 9.5 + 1.5 and status == 0 and currentWallDistanceFront > 40 and deltaH < 19.5 and deltaH > -19.5):
                 wheels.turn(30)
-                wheels.forward(40)
+                wheels.forward(50)
                 wheels.turn(-30)
                    
             currentSpot.updateCoords(dCoords) # use the displacement coordinates to update the current spot
-            mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize, 0) # Use this information to update the map
+            mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize) # Use this information to update the map
             
             if(recentChoice > 0): # One less loop until a new choice can be made 
                 recentChoice -= 1
@@ -243,69 +259,49 @@ def main():
         
     except KeyboardInterrupt:
         print("Escape")
-        # Move forward a LOT
-        time.sleep(10000) # end program
-        
+
+
+        wheels.forward(720) # Move away from the maze
         motorC.run_for_degrees(-480) # Open hatch
         time.sleep(2)
         wheels.forward(360) # Move forward so that you don't close on the object
         motorC.run_for_degrees(540) # Close hatch
         wheels.turn(-320) # Do a wheelie (to avoid seeming threatening)
         wheels.forward(360) # Move away from box
-            
+        
         # Add the IR position
+        if (numSpaces.y > IRCoords.y and numSpaces.x > IRCoords.x and IRCoords.y >= 0 and IRCoords.x >= 0):
+            totalMapList[IRCoords.y][IRCoords.x] = 2
+        else:
+            print("IR beacon out of range")
+        # Add the Mag position
+        if (numSpaces.y > magCoords.y and numSpaces.x > magCoords.x and magCoords.y >= 0 and magCoords.x >= 0):
+            totalMapList[magCoords.y][magCoords.x] = 3
+        else:
+            print("Magnetic beacon out of range")
+                    
+        # End position of robot
+        endX = m.floor(currentSpot.x/squareSize)
+        endY = m.floor(currentSpot.y/squareSize)
+            
+        # If within range, mark the end of the map
+        if (numSpaces.y > endY and numSpaces.x > endX and endY >= 0 and endX >= 0):
+            totalMapList[endY][endX] = 4
+        else:
+            print("End coordinate out of range")
+
+        # Add the ir position
         if (numSpaces.y > IRCoords.y and numSpaces.x > IRCoords.x and IRCoords.y >= 0 and IRCoords.x >= 0):
             totalMapList[IRCoords.y][IRCoords.x] = 2
         # Add the Mag position
         if (numSpaces.y > magCoords.y and numSpaces.x > magCoords.x and magCoords.y >= 0 and magCoords.x >= 0):
             totalMapList[magCoords.y][magCoords.x] = 3
-                        
-        totalMapList[m.floor(currentSpot.x/squareSize)][m.floor(currentSpot.y/squareSize)] = 4
-        mapFun.printHazards(IRthreshold, IRCoords, Magthreshold, magCoords, mapNum)
-            
-        mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize, 'isEnd')
+                 
+        # Do all of the mapping functions
+        mapFun.printHazards(IRmax, IRCoords, magMax, magCoords, mapNum)     
+        mapFun.mapCreation(currentSpot, totalMapList, numSpaces, squareSize)
         mapFun.exportMap(totalMapList, mapNum, origin)
         time.sleep(10000) # end program
-        
-
-            
-        '''
-        deltaCoordinates = 0 # Coordinate system can be update to include angle - why not? 
-        (Note - these average out over past N values)
-        get frontUltra sensor value + pushnpop
-        get sideUltra sensor value + pushnpop
-        get magnetic sensor value + pushnpop
-        get IR sensor value (front) + pushnpop
-        front = !frontUltra and !IR and !magnetic
-        side = sideUltra
-        if (side and front undefined):
-            move forward for 3 seconds
-            drop cargo
-            assure safety of cargo
-            break;
-        elif (side undefined and front defined):
-            turn right
-            move forward
-        elif (front undefined and side defined):
-            move forward
-        elif (side and front): 
-            if(random.choice([0,1] and cooldown):
-                move forward
-            else:
-                turn right
-                set cooldown to zero
-        elif (side and not front):
-            move forward
-            set cooldown to one
-        elif(not front and side):
-            turn right
-            set cooldown to one
-        elif(not front and not side):
-            turn left
-            set cooldown to one
-        update coordinates and map1 and map2
-        '''
-
                
 if __name__ == '__main__':
     main()
