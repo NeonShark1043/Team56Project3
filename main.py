@@ -61,7 +61,6 @@ def main():
     IR = IRSensor(IRpin, IRpin + 1) # The two IR pins must be next to eachother numerically
         
     # Get all of the setupt before the main loop - whether to go into a loop and the change in coordinates
-    fillingSensorVals = 0 
     recentChoice = 0
     dCoords = F.coordinates(0,0) # dCoords represents the coordinates relative to the previous ones and the absolute angle
     
@@ -255,7 +254,6 @@ def main():
             
             if(recentChoice > 0): # One less loop until a new choice can be made 
                 recentChoice -= 1
-            fillingSensorVals = sensorSum + 1 # Get a new batch of sensor values
         
     except KeyboardInterrupt:
         print("Escape")
