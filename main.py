@@ -87,8 +87,8 @@ def main():
 
                 # Update the list of sensor values
                 sumFront, frontList = F.pushNpopAvg(ultraF, frontList, sensorSum)
-                sumSideRight2, sideRightList2 = F.pushNpopAvg(ultraR2, sideListRight2, sensorSum)
-                sumSideRight1, sideRightList1 = F.pushNpopAvg(ultraR1, sideListRight1, sensorSum)
+                sumSideRight2, sideListRight2 = F.pushNpopAvg(ultraR2, sideListRight2, sensorSum)
+                sumSideRight1, sideListRight1 = F.pushNpopAvg(ultraR1, sideListRight1, sensorSum)
                 sumIR, IRList = F.pushNpopAvg(IRval, IRList, sensorSum)
                 sumMag, magList = F.pushNpopAvg(IMUval, magList, sensorSum)
         
